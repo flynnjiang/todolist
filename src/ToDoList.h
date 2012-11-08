@@ -15,10 +15,6 @@ public:
 	ToDoList();
 	~ToDoList();
 
-	virtual void create();
-	virtual void destory();
-	virtual void update();
-
 protected:
 	virtual void winClassDef(WNDCLASS &ws);
 
@@ -27,15 +23,17 @@ protected:
 
 	void itemUp(ToDo *todo);
 	void itemDown(ToDo *todo);
-	void setCompleted(ToDo *todo);
 
-	void loadData();
-	void saveData();
+	void loadItemsFromFile();
+	void saveItemsToFile();
+
+	void updateItems();
 
 private:
-	int showCompleted;
-	std::list<ToDo *> toDoList;
-	std::list<ToDo *> completed;
+	BOOL showCompleted;
+	ToDo *newItem;
+
+	std::list<ToDo *> items;
 };
 
 #endif /* _TODOLIST_H */

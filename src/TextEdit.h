@@ -1,7 +1,9 @@
 #ifndef _TEXTEDIT_H
 #define _TEXTEDIT_H
 
+
 #include "Window.h"
+#include "tstring.h"
 
 class TextEdit : public Window
 {
@@ -10,10 +12,10 @@ public:
 	~TextEdit();
 
 	BOOL isEmpty() const;
-	int getText(TCHAR *buf, int buf_len) const;
+	tstring getText() const;
 
-	void setText(TCHAR *);
-	void setTextLimit(int count);
+	void setText(tstring);
+	void setMaxLength(int count);
 
 
 protected:

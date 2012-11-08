@@ -5,7 +5,7 @@
 #include "CheckBox.h"
 
 CheckBox::CheckBox(Window *parent, DWORD style) :
-	Window(parent, style | BS_CHECKBOX | (parent ? WS_CHILD : 0))
+	Window(parent, style | BS_AUTOCHECKBOX | (parent ? WS_CHILD : 0), 0)
 {
 }
 

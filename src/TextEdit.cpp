@@ -1,5 +1,5 @@
 #include <tchar.h>
-
+#include "tstring.h"
 #include "TextEdit.h"
 
 TextEdit::TextEdit(Window *parent, DWORD style) :
@@ -24,19 +24,36 @@ BOOL TextEdit::isEmpty() const
 	return (0 == SendMessage(hSelf, EM_GETLINE, 0, (LPARAM)buffer));
 }
 
-int TextEdit::getText(TCHAR *buf, int buf_len) const
+
+tstring TextEdit::getText() const
 {
-	buf[0] = buf_len;
-	return SendMessage(hSelf, EM_GETLINE, 0, (LPARAM)buf);
+	LRESULT result;
+	TCHAR *buf = NULL;
+	tstring str;
+
+	result = SendMessage(hSelf, EM_LINELENGTH, 0, 0);
+	if (result > 0)
+	{
+		buf = new TCHAR[result+1]();
+		buf[0] = result;
+		result = SendMessage(hSelf, EM_GETLINE, 0, (LPARAM)buf);
+		if (result > 0)
+			str = buf;
+		delete [] buf;
+	}
+
+	return str;
 }
 
-void TextEdit::setText(TCHAR *s)
+void TextEdit::setText(tstring s)
 {
 	SendMessage(hSelf, EM_SETSEL, 0, -1);
-	SendMessage(hSelf, EM_REPLACESEL, FALSE, (LPARAM)s);
+	SendMessage(hSelf, EM_REPLACESEL, FALSE, (LPARAM)s.c_str());
 }
 
-void TextEdit::setTextLimit(int count)
+
+
+void TextEdit::setMaxLength(int count)
 {
 	SendMessage(hSelf, EM_LIMITTEXT, (WPARAM)count, 0);
 }

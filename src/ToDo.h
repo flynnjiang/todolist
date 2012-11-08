@@ -1,6 +1,8 @@
 #ifndef _TODO_H
 #define _TODO_H
 
+#include "tstring.h"
+
 #include "Window.h"
 #include "CheckBox.h"
 #include "TextEdit.h"
@@ -11,12 +13,11 @@ public:
 	ToDo(Window *parent = 0);
 	~ToDo();
 
-	BOOL isEmpty() const;
 	BOOL isCompleted() const;
-	int getContent(TCHAR *buf, int len) const;
+	tstring getContent() const;
 
-	void setCompleted(BOOL isCompleted);
-	void setContent(TCHAR *content);
+	void setCompleted(BOOL);
+	void setContent(tstring);
 
 protected:
 	virtual void winClassDef(WNDCLASS &ws);
@@ -24,7 +25,9 @@ protected:
 	virtual LRESULT CALLBACK winProc(
 				HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam);
 private:
-	TCHAR content[128];
+	BOOL _isCompleted;
+	tstring _content;
+
 	CheckBox *checkBox;
 	TextEdit *textEdit;
 };

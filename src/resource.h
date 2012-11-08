@@ -8,3 +8,4 @@
 
 /* ToDoList's command/notifications */
 #define WM_TDLIST_ICON_CMD						(WM_USER + 10)
+#define WM_TDLIST_INPUT_COMPLETED				(WM_USER + 11)

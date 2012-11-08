@@ -10,86 +10,48 @@
 ToDoList::ToDoList() :
 	Window(0, WS_BORDER | WS_CAPTION | WS_SYSMENU , WS_EX_TOOLWINDOW)
 {
+	showCompleted = TRUE;
 }
 
 ToDoList::~ToDoList()
 {
-	for (list<ToDo *>::iterator iter = toDoList.begin();
-		iter != toDoList.end(); ++iter)
-	{
-		delete *iter;
-	}
-
-	for (list<ToDo *>::iterator iter = completed.begin();
-		iter != completed.end(); ++iter)
-	{
-		delete *iter;
-	}
-
-	destory();
 }
 
-void ToDoList::create()
-{
-	NOTIFYICONDATA icon;
-
-	Window::create();
-
-	icon.hWnd = hSelf;
-	icon.uID = 1;
-	icon.uFlags = NIF_ICON|NIF_MESSAGE|NIF_TIP ;
-	icon.uCallbackMessage = WM_TDLIST_ICON_CMD;
-	icon.hIcon = LoadIcon(NULL, MAKEINTRESOURCE(IDI_APPLICATION)); 
-	_tcscpy_s(icon.szTip,_T("To-Do List"));
-
-	Shell_NotifyIcon(NIM_ADD, &icon);
-}
-
-void ToDoList::destory()
-{
-	NOTIFYICONDATA icon;
-
-	icon.hWnd = hSelf;
-	icon.uID = 1;
-
-	Shell_NotifyIcon(NIM_DELETE, &icon);
-}
-
-void ToDoList::update()
+void ToDoList::updateItems()
 {
 	int y = 0;
 	RECT rc;
 
-	//resize(0, 0);
-
-	for (list<ToDo *>::iterator iter = toDoList.begin();
-		iter != toDoList.end(); ++iter)
+	for (list<ToDo *>::iterator iter = items.begin();
+		iter != items.end(); ++iter)
 	{
-		(*iter)->move(0, y);
+
+		if (!showCompleted && (*iter)->isCompleted())
+		{
+			(*iter)->hide();
+			continue;
+		}
+
 		(*iter)->show();
+		(*iter)->resize(180, 24);
+		(*iter)->move(0, y);
+		(*iter)->update();
 
-		y = y + (*iter)->height();
-
-		//resize((*iter)->width(), height() + (*iter)->height() + 1);
+		y = y + 24;
 	}
 
-	for (list<ToDo *>::iterator iter = completed.begin();
-		iter != completed.end(); ++iter)
-	{
-		(*iter)->move(0, y);
-		(*iter)->show();
+	newItem->show();
+	newItem->resize(180, 24);
+	newItem->move(0, y);
+	newItem->update();
 
-		y = y + (*iter)->height();
-
-		//resize((*iter)->width(), height() + (*iter)->height() + 1);
-	}
-
-	resize(180, y + 24);
+	y += newItem->height() + 24;
+	resize(180, y);
 
 	SystemParametersInfo(SPI_GETWORKAREA, 0, &rc, 0);
 	move(rc.right - width(), rc.bottom - height());
 
-	Window::update();
+	update();
 }
 
 void ToDoList::itemUp(ToDo *todo)
@@ -100,12 +62,10 @@ void ToDoList::itemDown(ToDo *todo)
 {
 }
 
-void ToDoList::setCompleted(ToDo *todo)
-{
-}
 
-void ToDoList::loadData()
+void ToDoList::loadItemsFromFile()
 {
+
 	FILE *fp = NULL;
 	TCHAR buf[128] = {0};
 	TCHAR content[64] = {0};
@@ -119,22 +79,24 @@ void ToDoList::loadData()
 
 	while(_fgetts(buf, sizeof(buf), fp))
 	{
-		_stscanf_s(buf, _T("%d %s"), &isCompleted, content);
+		_stscanf_s(buf, _T("%d %s"), &isCompleted, content, _countof(content));
 
 		if (0 == isCompleted && 0 != _tcslen(content))
 		{
 			todo = new ToDo(this);
 			todo->create();
 			todo->setCompleted(FALSE);
-			todo->setContent(content);
-			toDoList.push_back(todo);
+			todo->setContent(tstring(content));
+
+			items.push_back(todo);
 		}
 	}
 
 	fclose(fp);
+
 }
 
-void ToDoList::saveData()
+void ToDoList::saveItemsToFile()
 {
 	FILE *fp = NULL;
 	TCHAR content[128] = {0};
@@ -144,11 +106,13 @@ void ToDoList::saveData()
 	if (0 != ret || NULL == fp)
 		return;
 
-	for (list<ToDo *>::iterator iter = toDoList.begin();
-		iter != toDoList.end(); ++iter)
+	for (list<ToDo *>::iterator iter = items.begin();
+		iter != items.end(); ++iter)
 	{
-		if (0 != (*iter)->getContent(content, 128))
-			_ftprintf(fp, _T("%d %s\n"), (*iter)->isCompleted(), content);
+		if (!(*iter)->getContent().empty())
+			_ftprintf(fp, _T("%d %s\n"),
+					(*iter)->isCompleted(),
+					(*iter)->getContent().c_str());
 	}
 
 	fclose(fp);
@@ -171,81 +135,83 @@ LRESULT CALLBACK ToDoList::winProc(
 				HWND hwnd, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	int y = 0;
+	ToDo *todo = NULL;
+	NOTIFYICONDATA icon;
 
 	switch(Message)
 	{
-		case WM_CREATE:
-		{
-			loadData();
+	case WM_CREATE:
+		icon.hWnd = hSelf;
+		icon.uID = 1;
+		icon.uFlags = NIF_ICON|NIF_MESSAGE|NIF_TIP ;
+		icon.uCallbackMessage = WM_TDLIST_ICON_CMD;
+		icon.hIcon = LoadIcon(NULL, MAKEINTRESOURCE(IDI_APPLICATION)); 
+		_tcscpy_s(icon.szTip,_T("To-Do List"));
+		Shell_NotifyIcon(NIM_ADD, &icon);
 
-			ToDo *todo = new ToDo(this);
+		loadItemsFromFile();
+
+		newItem = new ToDo(this);
+		newItem->create();
+		newItem->setContent(tstring(_T("")));
+
+		updateItems();
+		break;
+
+
+	case WM_SYSCOMMAND:
+		if (SC_CLOSE == wParam)
+			saveItemsToFile();
+		
+		return ::DefWindowProc(hwnd, Message, wParam, lParam);
+
+
+	case WM_TODO_COMPLETED_NOTIFY:
+		todo = (ToDo *)wParam;
+		items.remove(todo);
+		if (todo->isCompleted())
+			items.push_back(todo);
+		else
+			items.push_front(todo);
+
+		updateItems();
+
+		break;
+
+
+	case WM_TODO_CONTENT_CHANGED_NOTIFY:
+		if ((ToDo *)wParam == newItem && !newItem->getContent().empty())
+		{
+			todo = new ToDo(this);
 			todo->create();
-			todo->setCompleted(FALSE);
-			toDoList.push_back(todo);
+			todo->setContent(newItem->getContent());
+			items.push_front(todo);
 
-			break;
+			newItem->setContent(tstring(_T("")));
+
+			updateItems();
 		}
+		break;
 
-		case WM_SYSCOMMAND:
-		{
-			if (SC_CLOSE == wParam)
-				saveData();
-			
-			return ::DefWindowProc(hwnd, Message, wParam, lParam);
-		}
 
-		case WM_TODO_COMPLETED_NOTIFY:
-		{
-			ToDo *toDo = (ToDo *)wParam;
+	case WM_DESTROY:
+		::PostQuitMessage(0);
+		break;
 
-			if (toDo->isCompleted())
-			{
-				toDoList.remove(toDo);
-				completed.push_back(toDo);
-			}
-			else
-			{
-				completed.remove(toDo);
-				toDoList.push_front(toDo);
-			}
+	case WM_NCDESTROY:
+		icon.hWnd = hSelf;
+		icon.uID = 1;
+		Shell_NotifyIcon(NIM_DELETE, &icon);
 
-			update();
-			
-			break;
-		}
+		for (list<ToDo *>::iterator iter = items.begin(); iter != items.end(); ++iter)
+			delete *iter;
 
-		case WM_TODO_CONTENT_CHANGED_NOTIFY:
-		{
-			ToDo *toDo;
-			list<ToDo *>::iterator iter;
+		items.clear();
 
-			for (iter = toDoList.begin();
-				iter != toDoList.end(); ++iter)
-			{
-				if ((*iter)->isEmpty() && (*iter) != (ToDo *)wParam)
-					break;
-			}
+		delete newItem;
 
-			if (iter == toDoList.end())
-			{
-				toDo = new ToDo(this);
-				
-				toDo->create();
-				toDoList.push_back(toDo);
-				update();
-			}
-
-			break;
-		}
-
-		case WM_DESTROY:
-		{
-			::PostQuitMessage(0);
-			break;
-		}
-
-		default :
-		  return ::DefWindowProc(hwnd, Message, wParam, lParam);
+	default :
+	  return ::DefWindowProc(hwnd, Message, wParam, lParam);
 	}
 
 	return 0;

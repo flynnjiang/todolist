@@ -6,6 +6,7 @@
 ToDo::ToDo(Window *parent) :
 	Window(parent, (parent ? WS_CHILD : 0))
 {
+	_isCompleted = 0;
 	checkBox = new CheckBox(this);
 	textEdit = new TextEdit(this);
 }
@@ -16,32 +17,29 @@ ToDo::~ToDo()
 	delete textEdit;
 }
 
-BOOL ToDo::isEmpty() const
-{
-	return textEdit->isEmpty();
-}
 
 BOOL ToDo::isCompleted() const
 {
-	return checkBox->isChecked();
+	return _isCompleted;
 }
 
 
-int ToDo::getContent(TCHAR *buf, int len) const
+tstring ToDo::getContent() const
 {
-	return textEdit->getText(buf, len);
+	return _content;
 }
 
-void ToDo::setCompleted(BOOL isCompleted)
+void ToDo::setCompleted(BOOL param)
 {
-	return checkBox->setChecked(isCompleted);
+	_isCompleted = param;
+	checkBox->setChecked(_isCompleted);
 }
 
-void ToDo::setContent(TCHAR *content)
+void ToDo::setContent(tstring content)
 {
-	return textEdit->setText(content);
+	_content = content;
+	textEdit->setText(_content);
 }
-
 
 
 void ToDo::winClassDef(WNDCLASS &ws)
@@ -63,84 +61,78 @@ LRESULT CALLBACK ToDo::winProc(
 
 	switch(Message)
 	{
+
 		case WM_CREATE:
-			//MessageBox( NULL, TEXT("Create checkBox"), TEXT("Error"), MB_OK | MB_ICONSTOP);
-			this->resize(180, 24);
+			resize(180, 48);
 
 			checkBox->create();
 			checkBox->resize(16, 24);
 			checkBox->move(0, 0);
+			checkBox->setEnabled(TRUE);
 			checkBox->show();
-			checkBox->setEnabled(FALSE);
 			
 			textEdit->create();
 			textEdit->resize(164, 24);
 			textEdit->move(16, 0);
-			textEdit->setTextLimit(32);
+			textEdit->setMaxLength(32);
 			textEdit->show();
 
 			font = (HFONT)GetStockObject(ANSI_FIXED_FONT); 
 			SendMessage(textEdit->getHandle(), WM_SETFONT, (WPARAM)font, TRUE);
+
 			break;
+
 
 		case WM_COMMAND:
 			switch (HIWORD(wParam))
 			{
-				case BN_CLICKED:
+			case BN_CLICKED:
+				if ((HWND)lParam == checkBox->getHandle())
 				{
-					checkBox->setChecked(!checkBox->isChecked());
-					textEdit->setEnabled(!checkBox->isChecked());
-					SendMessage(hParent->getHandle(), WM_TODO_COMPLETED_NOTIFY,
-							(WPARAM)this, (LPARAM)(checkBox->isChecked()));
-					break;
+					_isCompleted = checkBox->isChecked();
+					SendMessage(hParent->getHandle(), WM_TODO_COMPLETED_NOTIFY, (WPARAM)this, 0);
 				}
+				break;
 
-				case EN_SETFOCUS:
-				{
-					SendMessage(hParent->getHandle(), WM_TODO_CONTENT_CHANGED_NOTIFY,
-							(WPARAM)this, 0);
-					break;
-				}
+			case EN_KILLFOCUS:
+			//case EN_SETFOCUS:
+				SendMessage(hParent->getHandle(), WM_TODO_CONTENT_CHANGED_NOTIFY, (WPARAM)this, 0);
+				break;
 
-				case EN_CHANGE:
-				{
-					checkBox->setEnabled(!textEdit->isEmpty());
-					break;
-				}
+			case EN_CHANGE:
+				_content = textEdit->getText();
+				checkBox->setEnabled(!_content.empty());
+				break;
 
-				default:
-					break;
+			default:
+				break;
 			}
+
 			break;
 
-#if 1
+
+		case WM_KEYDOWN:
+
+			break;
+
 		case WM_CTLCOLOREDIT:
 		//case WM_CTLCOLORBTN:
-		{
-			if (checkBox->isChecked())
-			{
+			if (_isCompleted)
 				SetTextColor((HDC)wParam,RGB(0x99,0x99,0x99));
-			}
 			else
-			{
 				SetTextColor((HDC)wParam,RGB(0,0,0));
-			}
 
 			SetBkColor((HDC)wParam,RGB(192,192,192));
 
 			return (LONG)GetStockObject(LTGRAY_BRUSH);
 
-		}
-#endif
 
 		case WM_DESTROY:
-		{
 			::PostQuitMessage(0);
 			break;
-		}
 
 		default :
-		  return ::DefWindowProc(hwnd, Message, wParam, lParam);
+			return ::DefWindowProc(hwnd, Message, wParam, lParam);
 	}
 
 	return 0;
